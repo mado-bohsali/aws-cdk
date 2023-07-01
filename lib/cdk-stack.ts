@@ -5,7 +5,7 @@ import * as lambda from "aws-cdk-lib/aws-lambda";
 import * as sns from "aws-cdk-lib/aws-sns";
 import * as sqs from "aws-cdk-lib/aws-sqs";
 import * as subs from "aws-cdk-lib/aws-sns-subscriptions";
-
+import { HitCounter } from "./hit-counter";
 
 export class CdkStack extends cdk.Stack {
   constructor(scope: Construct, id: string, props?: cdk.StackProps) {
@@ -25,13 +25,27 @@ export class CdkStack extends cdk.Stack {
       code: lambda.Code.fromAsset("lambda"),
       handler: "function.handler",
     });
+    new apigw.LambdaRestApi(this, "Endpoint", {
+      handler: lambda_function,
+    });
+
+    const hello_lambda_function = new lambda.Function(this, "HelloHandler", {
+      runtime: lambda.Runtime.NODEJS_16_X,
+      code: lambda.Code.fromAsset("lambda"),
+      handler: "hitcounter.handler",
+    });
+
+    const helloWithCounter = new HitCounter(this, "HelloHitCounter", {
+      downstream: hello_lambda_function,
+    });
+
+    // defines an API Gateway REST API resource backed by our "hello" function.
+    new apigw.LambdaRestApi(this, "Endpoint", {
+      handler: helloWithCounter.handler,
+    });
 
     const topic = new sns.Topic(this, "CdkWorkshopTopic");
 
     topic.addSubscription(new subs.SqsSubscription(queue));
-
-    new apigw.LambdaRestApi(this, 'Endpoint',{
-      handler: lambda_function
-    });
   }
 }
